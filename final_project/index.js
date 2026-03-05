@@ -10,8 +10,30 @@ app.use(express.json());
 
 app.use("/customer",session({secret:"fingerprint_customer",resave: true, saveUninitialized: true}))
 
-app.use("/customer/auth/*", function auth(req,res,next){
-//Write the authenication mechanism here
+app.use("/customer/auth/*", function auth(req, res, next) {
+  const sessionToken = req.session?.authorization?.accessToken;
+
+  const authHeader = req.headers.authorization; // "Bearer <token>"
+  const headerToken =
+    typeof authHeader === "string" && authHeader.startsWith("Bearer ")
+      ? authHeader.slice("Bearer ".length)
+      : null;
+
+  const token = sessionToken || headerToken;
+
+  if (!token) {
+    return res.status(401).json({
+      message: "Missing auth token. Login and send Authorization: Bearer <token>.",
+    });
+  }
+
+  try {
+    const decoded = jwt.verify(token, "fingerprint_customer");
+    req.user = decoded.username; // attach username to request
+    return next();
+  } catch (err) {
+    return res.status(401).json({ message: "Invalid/expired token." });
+  }
 });
  
 const PORT =5000;
